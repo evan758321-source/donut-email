@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DonutSMP Dashboard</title>
+  <style>
+    :root {
+      --bg: #0d0d0d;
+      --bg2: #141414;
+      --bg3: #1c1c1c;
+      --bg4: #242424;
+      --border: #2a2a2a;
+      --accent: #FF6B35;
+      --accent2: #FF8C42;
+      --accent3: #ffad60;
+      --text: #e8e8e8;
+      --text2: #9a9a9a;
+      --text3: #555;
+      --green: #22c55e;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --yellow: #f59e0b;
+      --purple: #a855f7;
+      --radius: 10px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Login Screen ── */
+    #login-screen {
+      position: fixed; inset: 0; background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+    }
+    .login-box {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      width: 360px;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .login-logo { font-size: 52px; margin-bottom: 8px; }
+    .login-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .login-sub { color: var(--text2); font-size: 13px; margin-bottom: 28px; }
+    .login-box input {
+      width: 100%; padding: 12px 16px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text); font-size: 15px;
+      outline: none; margin-bottom: 12px;
+      transition: border-color .2s;
+    }
+    .login-box input:focus { border-color: var(--accent); }
+    .login-box button {
+      width: 100%; padding: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: var(--radius);
+      color: #fff; font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .login-box button:hover { opacity: .9; }
+    .login-error {
+      color: var(--red); font-size: 13px;
+      margin-top: 10px; min-height: 18px;
+    }
+
+    /* ── App Layout ── */
+    #app { display: none; height: 100vh; flex-direction: column; }
+    #app.visible { display: flex; }
+
+    /* ── Top Bar ── */
+    .topbar {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      height: 52px;
+      display: flex; align-items: center; gap: 16px;
+      flex-shrink: 0;
+    }
+    .topbar-logo { font-size: 22px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .topbar-logo span { color: var(--accent); }
+    .topbar-spacer { flex: 1; }
+    .poll-indicator {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--text2);
+    }
+    .poll-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+    .poll-dot.error { background: var(--red); animation: none; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: .3; }
+    }
+    .role-badge {
+      padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      background: rgba(255,107,53,.15); color: var(--accent); border: 1px solid rgba(255,107,53,.3);
+    }
+    .role-badge.admin { background: rgba(168,85,247,.15); color: var(--purple); border-color: rgba(168,85,247,.3); }
+    .btn-sm {
+      padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--bg3); color: var(--text2); font-size: 12px; cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Navigation Tabs ── */
+    .nav-tabs {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      display: flex; overflow-x: auto; gap: 0;
+      flex-shrink: 0;
+      scrollbar-width: none;
+    }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+    .nav-tab {
+      padding: 10px 18px; cursor: pointer;
+      font-size: 13px; font-weight: 500; color: var(--text2);
+      border-bottom: 2px solid transparent;
+      white-space: nowrap; transition: all .15s;
+      display: flex; align-items: center; gap: 6px;
+      user-select: none;
+    }
+    .nav-tab:hover { color: var(--text); background: var(--bg3); }
+    .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .nav-tab.admin-only { color: var(--purple); }
+    .nav-tab.admin-only.active { color: var(--purple); border-bottom-color: var(--purple); }
+
+    /* ── Content Area ── */
+    .content { flex: 1; overflow-y: auto; padding: 24px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .card-title {
+      font-size: 13px; font-weight: 600; color: var(--text2);
+      text-transform: uppercase; letter-spacing: .06em;
+      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px 20px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .stat-card .stat-label { font-size: 12px; color: var(--text2); font-weight: 500; }
+    .stat-card .stat-value { font-size: 26px; font-weight: 700; color: var(--text); }
+    .stat-card .stat-sub { font-size: 11px; color: var(--text3); }
+    .stat-card .stat-icon { font-size: 20px; margin-bottom: 4px; }
+
+    /* ── Search Bar ── */
+    .search-row {
+      display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap;
+    }
+    .search-row input, .search-row select {
+      padding: 9px 14px; background: var(--bg3);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text); font-size: 13px; outline: none;
+      transition: border-color .2s;
+    }
+    .search-row input { flex: 1; min-width: 160px; }
+    .search-row input:focus, .search-row select:focus { border-color: var(--accent); }
+    .search-row select { background: var(--bg3); }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 9px 18px; border-radius: var(--radius);
+      border: none; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all .15s; white-space: nowrap;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+    }
+    .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-secondary {
+      background: var(--bg3); color: var(--text2);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-danger {
+      background: rgba(239,68,68,.12); color: var(--red);
+      border: 1px solid rgba(239,68,68,.25);
+    }
+    .btn-danger:hover { background: rgba(239,68,68,.2); }
+    .btn-success {
+      background: rgba(34,197,94,.12); color: var(--green);
+      border: 1px solid rgba(34,197,94,.25);
+    }
+    .btn-success:hover { background: rgba(34,197,94,.2); }
+    .btn-purple {
+      background: rgba(168,85,247,.12); color: var(--purple);
+      border: 1px solid rgba(168,85,247,.25);
+    }
+    .btn-purple:hover { background: rgba(168,85,247,.2); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+
+    /* ── Tables ── */
+    .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: var(--bg3); padding: 10px 14px;
+      text-align: left; font-size: 11px; font-weight: 600;
+      color: var(--text2); text-transform: uppercase; letter-spacing: .05em;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--bg3); }
+    tbody td { padding: 10px 14px; font-size: 13px; color: var(--text); }
+    .td-muted { color: var(--text2); }
+    .td-price { color: var(--accent); font-weight: 600; font-family: monospace; }
+    .td-rank { color: var(--text2); font-weight: 700; width: 50px; }
+
+    /* ── Badge/Chips ── */
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+    }
+    .badge-green { background: rgba(34,197,94,.15); color: var(--green); }
+    .badge-red { background: rgba(239,68,68,.15); color: var(--red); }
+    .badge-blue { background: rgba(59,130,246,.15); color: var(--blue); }
+    .badge-yellow { background: rgba(245,158,11,.15); color: var(--yellow); }
+    .badge-purple { background: rgba(168,85,247,.15); color: var(--purple); }
+    .badge-orange { background: rgba(255,107,53,.15); color: var(--accent); }
+
+    /* ── Pagination ── */
+    .pagination {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 16px; justify-content: center;
+    }
+    .pagination button {
+      padding: 6px 14px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--bg3);
+      color: var(--text2); cursor: pointer; font-size: 13px;
+      transition: all .15s;
+    }
+    .pagination button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .pagination button:disabled { opacity: .4; cursor: not-allowed; }
+    .page-info { font-size: 13px; color: var(--text2); padding: 0 8px; }
+
+    /* ── Section Header ── */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px; flex-wrap: wrap; gap: 10px;
+    }
+    .section-title { font-size: 18px; font-weight: 700; }
+    .section-sub { color: var(--text2); font-size: 13px; margin-top: 2px; }
+
+    /* ── Empty State ── */
+    .empty-state {
+      text-align: center; padding: 48px 24px;
+      color: var(--text2);
+    }
+    .empty-state .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-state .empty-text { font-size: 15px; font-weight: 500; }
+    .empty-state .empty-sub { font-size: 13px; color: var(--text3); margin-top: 6px; }
+
+    /* ── Loading ── */
+    .loading {
+      display: flex; align-items: center; justify-content: center;
+      padding: 48px; color: var(--text2); gap: 12px;
+    }
+    .spinner {
+      width: 20px; height: 20px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Player Info Card ── */
+    .player-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px;
+    }
+    .player-card-header {
+      display: flex; align-items: center; gap: 16px; margin-bottom: 20px;
+    }
+    .player-avatar {
+      width: 56px; height: 56px; background: var(--bg3);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      font-size: 28px; border: 1px solid var(--border);
+    }
+    .player-name { font-size: 20px; font-weight: 700; }
+    .player-rank { color: var(--text2); font-size: 13px; }
+    .stats-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+    .stat-row {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px;
+    }
+    .stat-row-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; }
+    .stat-row-value { font-size: 16px; font-weight: 700; margin-top: 2px; color: var(--accent); }
+
+    /* ── Alert Cards ── */
+    .alert-list { display: flex; flex-direction: column; gap: 10px; }
+    .alert-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 18px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .alert-card.disabled { opacity: .5; }
+    .alert-icon { font-size: 22px; flex-shrink: 0; }
+    .alert-info { flex: 1; }
+    .alert-name { font-weight: 600; font-size: 14px; }
+    .alert-meta { font-size: 12px; color: var(--text2); margin-top: 3px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .alert-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.75);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 500; padding: 20px;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px;
+      width: 100%; max-width: 500px;
+      box-shadow: var(--shadow);
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 10px 14px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 13px; outline: none;
+      transition: border-color .2s;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
+    .form-group textarea { resize: vertical; min-height: 80px; font-family: monospace; }
+    .form-hint { font-size: 11px; color: var(--text3); margin-top: 4px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+    .modal-divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed; top: 20px; right: 20px;
+      z-index: 9999; display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast {
+      padding: 12px 18px; border-radius: 10px;
+      font-size: 13px; font-weight: 500;
+      box-shadow: 0 4px 20px rgba(0,0,0,.4);
+      display: flex; align-items: center; gap: 10px;
+      animation: toastIn .25s ease;
+      max-width: 320px;
+    }
+    @keyframes toastIn { from { transform: translateX(20px); opacity:0; } to { transform: none; opacity:1; } }
+    .toast-success { background: #052e16; border: 1px solid #166534; color: var(--green); }
+    .toast-error { background: #1c0a0a; border: 1px solid #7f1d1d; color: var(--red); }
+    .toast-info { background: #0c1a2e; border: 1px solid #1e3a5f; color: var(--blue); }
+    .toast-warn { background: #1c1300; border: 1px solid #78350f; color: var(--yellow); }
+
+    /* ── Shield sub-tabs ── */
+    .sub-tabs { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
+    .sub-tab {
+      padding: 7px 16px; border-radius: 20px; font-size: 13px; cursor: pointer;
+      background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
+      transition: all .15s;
+    }
+    .sub-tab:hover { border-color: var(--accent); color: var(--accent); }
+    .sub-tab.active { background: rgba(255,107,53,.15); border-color: var(--accent); color: var(--accent); }
+
+    /* ── Enchants tag ── */
+    .enchant-tag {
+      display: inline-block; padding: 1px 6px; border-radius: 4px;
+      background: rgba(168,85,247,.15); color: var(--purple);
+      font-size: 11px; margin: 1px; white-space: nowrap;
+    }
+
+    /* ── Section spacing ── */
+    .mb16 { margin-bottom: 16px; }
+    .mb24 { margin-bottom: 24px; }
+    .mt16 { margin-top: 16px; }
+
+    /* ── Time display ── */
+    .time-left { font-size: 12px; color: var(--text2); white-space: nowrap; }
+    .time-left.urgent { color: var(--red); }
+    .time-left.soon { color: var(--yellow); }
+
+    /* ── Config textarea ── */
+    .json-display {
+      background: #0a0a0a; border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px;
+      font-family: 'Courier New', monospace; font-size: 12px;
+      color: #7dd3fc; white-space: pre; overflow: auto;
+      max-height: 320px;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .content { padding: 14px; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .search-row { flex-direction: column; }
+      .search-row input { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">🍩</div>
+    <div class="login-title">DonutSMP Dashboard</div>
+    <div class="login-sub">Enter your dashboard password to continue</div>
+    <input type="password" id="pw-input" placeholder="Password" autocomplete="current-password">
+    <button onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="topbar-logo">🍩 <span>DonutSMP</span> <span style="color:var(--text3);font-weight:400">Dashboard</span></div>
+    <div class="topbar-spacer"></div>
+    <div class="poll-indicator">
+      <div class="poll-dot" id="poll-dot"></div>
+      <span id="poll-label">Connecting...</span>
+    </div>
+    <div class="role-badge" id="role-badge">User</div>
+    <button class="btn-sm" onclick="doLogout()">Logout</button>
+  </div>
+
+  <!-- Tabs Nav -->
+  <div class="nav-tabs" id="nav-tabs">
+    <div class="nav-tab active" data-tab="dashboard">🏠 Dashboard</div>
+    <div class="nav-tab" data-tab="auction">🔨 Auction House</div>
+    <div class="nav-tab" data-tab="transactions">📋 Transactions</div>
+    <div class="nav-tab" data-tab="leaderboards">🏆 Leaderboards</div>
+    <div class="nav-tab" data-tab="lookup">👤 Lookup</div>
+    <div class="nav-tab" data-tab="stats">📊 Statistics</div>
+    <div class="nav-tab admin-only hidden" id="tab-shield" data-tab="shield">🛡️ Shield</div>
+    <div class="nav-tab" data-tab="alerts">🔔 Alerts</div>
+    <div class="nav-tab" data-tab="settings">⚙️ Settings</div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- ═══ Dashboard Tab ═══ -->
+    <div class="tab-panel active" id="panel-dashboard">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Dashboard</div>
+          <div class="section-sub">Real-time overview — polls every 10 seconds</div>
+        </div>
+        <button class="btn btn-secondary" onclick="loadDashboard()">↻ Refresh</button>
+      </div>
+
+      <div class="stats-grid" id="dash-stats">
+        <div class="stat-card">
+          <div class="stat-icon">📦</div>
+          <div class="stat-label">Items Tracked</div>
+          <div class="stat-value" id="d-items">—</div>
+          <div class="stat-sub">in auction snapshot</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🔔</div>
+          <div class="stat-label">Active Alerts</div>
+          <div class="stat-value" id="d-active">—</div>
+          <div class="stat-sub">monitoring now</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⚡</div>
+          <div class="stat-label">Alerts Triggered</div>
+          <div class="stat-value" id="d-triggered">—</div>
+          <div class="stat-sub">total all time</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🕐</div>
+          <div class="stat-label">Last Poll</div>
+          <div class="stat-value" style="font-size:14px;padding-top:6px" id="d-last-poll">—</div>
+          <div class="stat-sub">10s interval</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px;" class="dash-grid">
+        <div class="card">
+          <div class="card-title">⚡ Recent Alert Activity</div>
+          <div id="dash-history">
+            <div class="loading"><div class="spinner"></div>Loading...</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📡 Poll Log</div>
+          <div id="dash-polllog">
+            <div class="loading"><div class="spinner"></div>Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Auction House Tab ═══ -->
+    <div class="tab-panel" id="panel-auction">
+      <div class="section-header">
+        <div>
+          <div class="section-title">🔨 Auction House</div>
+          <div class="section-sub">Browse live auction listings</div>
+        </div>
+      </div>
+      <div class="search-row">
+        <input type="text" id="ah-search" placeholder="Search items... (e.g. diamond sword)" onkeydown="if(event.key==='Enter')loadAuction(1)">
+        <select id="ah-sort">
+          <option value="">Default Sort</option>
+          <option value="lowest_price">Lowest Price</option>
+          <option value="highest_price">Highest Price</option>
+          <option value="recently_listed">Recently Listed</option>
+          <option value="last_listed">Last Listed</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadAuction(1)">🔍 Search</button>
+        <button class="btn btn-secondary" onclick="clearAuctionSearch()">✕ Clear</button>
+      </div>
+      <div id="ah-results">
+        <div class="loading"><div class="spinner"></div>Loading auction data...</div>
+      </div>
+      <div class="pagination" id="ah-pagination"></div>
+    </div>
+
+    <!-- ═══ Transactions Tab ═══ -->
+    <div class="tab-panel" id="panel-transactions">
+      <div class="section-header">
+        <div>
+          <div class="section-title">📋 Auction Transactions</div>
+          <div class="section-sub">Recent completed sales (max 10 pages, 100 items each)</div>
+        </div>
+      </div>
+      <div id="tx-results">
+        <div class="loading"><div class="spinner"></div>Loading transactions...</div>
+      </div>
+      <div class="pagination" id="tx-pagination"></div>
+    </div>
+
+    <!-- ═══ Leaderboards Tab ═══ -->
+    <div class="tab-panel" id="panel-leaderboards">
+      <div class="section-header">
+        <div>
+          <div class="section-title">🏆 Leaderboards</div>
+          <div class="section-sub">Top players by category</div>
+        </div>
+      </div>
+      <div class="search-row mb16">
+        <select id="lb-type" onchange="loadLeaderboard(1)">
+          <option value="money">💰 Money</option>
+          <option value="kills">⚔️ Kills</option>
+          <option value="deaths">💀 Deaths</option>
+          <option value="mobskilled">🧟 Mobs Killed</option>
+          <option value="brokenblocks">⛏️ Blocks Broken</option>
+          <option value="placedblocks">🧱 Blocks Placed</option>
+          <option value="playtime">⏱️ Playtime</option>
+          <option value="shards">💎 Shards</option>
+          <option value="sell">🛒 Sell Revenue</option>
+          <option value="shop">🏪 Shop Spending</option>
+        </select>
+        <button class="btn btn-secondary" onclick="loadLeaderboard(1)">↻ Refresh</button>
+      </div>
+      <div id="lb-results">
+        <div class="loading"><div class="spinner"></div>Loading leaderboard...</div>
+      </div>
+      <div class="pagination" id="lb-pagination"></div>
+    </div>
+
+    <!-- ═══ Lookup Tab ═══ -->
+    <div class="tab-panel" id="panel-lookup">
+      <div class="section-header">
+        <div>
+          <div class="section-title">👤 Player Lookup</div>
+          <div class="section-sub">Find a player's current location and rank</div>
+        </div>
+      </div>
+      <div class="search-row mb24">
+        <input type="text" id="lookup-user" placeholder="Enter username..." onkeydown="if(event.key==='Enter')doLookup()">
+        <button class="btn btn-primary" onclick="doLookup()">🔍 Lookup</button>
+      </div>
+      <div id="lookup-result"></div>
+    </div>
+
+    <!-- ═══ Statistics Tab ═══ -->
+    <div class="tab-panel" id="panel-stats">
+      <div class="section-header">
+        <div>
+          <div class="section-title">📊 Player Statistics</div>
+          <div class="section-sub">Detailed stats for any player</div>
+        </div>
+      </div>
+      <div class="search-row mb24">
+        <input type="text" id="stats-user" placeholder="Enter username..." onkeydown="if(event.key==='Enter')doStats()">
+        <button class="btn btn-primary" onclick="doStats()">📊 Get Stats</button>
+      </div>
+      <div id="stats-result"></div>
+    </div>
+
+    <!-- ═══ Shield Tab (Admin) ═══ -->
+    <div class="tab-panel" id="panel-shield">
+      <div class="section-header">
+        <div>
+          <div class="section-title">🛡️ Shield Management</div>
+          <div class="section-sub" style="color:var(--purple)">Admin only — Anti-DDoS infrastructure</div>
+        </div>
+      </div>
+      <div class="search-row mb16">
+        <input type="text" id="shield-service" placeholder="Service ID..." value="">
+        <button class="btn btn-primary" onclick="loadShieldData()">Load</button>
+      </div>
+      <div class="sub-tabs">
+        <div class="sub-tab active" data-shield="metrics" onclick="setShieldTab('metrics')">📡 Metrics</div>
+        <div class="sub-tab" data-shield="stats" onclick="setShieldTab('stats')">📊 Stats</div>
+        <div class="sub-tab" data-shield="bedrock" onclick="setShieldTab('bedrock')">🟦 Bedrock Config</div>
+        <div class="sub-tab" data-shield="java" onclick="setShieldTab('java')">☕ Java Config</div>
+      </div>
+      <div id="shield-panel-metrics" class="shield-panel">
+        <div class="empty-state"><div class="empty-icon">📡</div><div class="empty-text">Enter a Service ID and click Load</div></div>
+      </div>
+      <div id="shield-panel-stats" class="shield-panel" style="display:none">
+        <div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">Enter a Service ID and click Load</div></div>
+      </div>
+      <div id="shield-panel-bedrock" class="shield-panel" style="display:none">
+        <div class="empty-state"><div class="empty-icon">🟦</div><div class="empty-text">Enter a Service ID and click Load</div></div>
+      </div>
+      <div id="shield-panel-java" class="shield-panel" style="display:none">
+        <div class="empty-state"><div class="empty-icon">☕</div><div class="empty-text">Enter a Service ID and click Load</div></div>
+      </div>
+    </div>
+
+    <!-- ═══ Alerts Tab ═══ -->
+    <div class="tab-panel" id="panel-alerts">
+      <div class="section-header">
+        <div>
+          <div class="section-title">🔔 Email Alerts</div>
+          <div class="section-sub">Get notified when conditions are met on the Auction House</div>
+        </div>
+        <button class="btn btn-primary" onclick="openAlertModal()">+ New Alert</button>
+      </div>
+
+      <div class="card mb24">
+        <div class="card-title">📋 Active Alerts</div>
+        <div id="alerts-list">
+          <div class="loading"><div class="spinner"></div>Loading alerts...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="justify-content:space-between">
+          ⚡ Alert History
+          <button class="btn btn-danger" style="font-size:11px;padding:4px 10px" onclick="clearHistory()">Clear History</button>
+        </div>
+        <div id="alerts-history">
+          <div class="loading"><div class="spinner"></div>Loading history...</div>
+        </div>
+        <div class="pagination" id="history-pagination"></div>
+      </div>
+    </div>
+
+    <!-- ═══ Settings Tab ═══ -->
+    <div class="tab-panel" id="panel-settings">
+      <div class="section-header">
+        <div>
+          <div class="section-title">⚙️ Settings</div>
+          <div class="section-sub">Configuration and utilities</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px">
+        <div class="card">
+          <div class="card-title">📧 Test Email</div>
+          <div class="form-group">
+            <label>Send Test Email To</label>
+            <input type="email" id="test-email-addr" placeholder="you@gmail.com">
+          </div>
+          <button class="btn btn-primary" onclick="sendTestEmail()">📤 Send Test Email</button>
+          <div id="test-email-result" style="margin-top:12px;font-size:13px;"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🔧 System Info</div>
+          <div id="settings-info">
+            <div class="loading"><div class="spinner"></div>Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📖 Alert Types Reference</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
+          <div class="stat-row">
+            <div class="stat-row-label">💰 Price Drop</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px">Alert when an item matching your search is listed below a price threshold</div>
+          </div>
+          <div class="stat-row">
+            <div class="stat-row-label">📉 Price Decrease</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px">Alert when a new listing for an item is cheaper than any previously seen price</div>
+          </div>
+          <div class="stat-row">
+            <div class="stat-row-label">👤 Seller Alert</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px">Alert whenever a specific player posts anything new to the Auction House</div>
+          </div>
+          <div class="stat-row">
+            <div class="stat-row-label">🆕 New Item Listing</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px">Alert when any new listing matching your search term appears</div>
+          </div>
+          <div class="stat-row">
+            <div class="stat-row-label">📦 Any New Listing</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px">Alert on every single new listing that appears on the Auction House</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end .content -->
+</div><!-- end #app -->
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- Create Alert Modal -->
+<div class="modal-overlay hidden" id="alert-modal">
+  <div class="modal">
+    <div class="modal-title">🔔 <span id="modal-title-text">Create Alert</span></div>
+    <input type="hidden" id="alert-edit-id">
+
+    <div class="form-group">
+      <label>Alert Name *</label>
+      <input type="text" id="alert-name" placeholder="e.g. Cheap Diamond Sword">
+    </div>
+    <div class="form-group">
+      <label>Alert Type *</label>
+      <select id="alert-type" onchange="updateAlertForm()">
+        <option value="price_drop">💰 Price Drop — item below threshold</option>
+        <option value="price_decrease">📉 Price Decrease — new lowest price</option>
+        <option value="seller_alert">👤 Seller Alert — specific player lists item</option>
+        <option value="new_item_listing">🆕 New Item Listing — search term appears</option>
+        <option value="any_new_listing">📦 Any New Listing — any new item</option>
+      </select>
+    </div>
+    <div class="form-group" id="field-search" style="display:none">
+      <label>Search Term *</label>
+      <input type="text" id="alert-search" placeholder="e.g. diamond sword">
+      <div class="form-hint">Partial match — case insensitive</div>
+    </div>
+    <div class="form-group" id="field-seller" style="display:none">
+      <label>Seller Username *</label>
+      <input type="text" id="alert-seller" placeholder="e.g. Notch">
+      <div class="form-hint">Exact username match (case insensitive)</div>
+    </div>
+    <div class="form-group" id="field-threshold" style="display:none">
+      <label>Price Threshold *</label>
+      <input type="number" id="alert-threshold" placeholder="e.g. 5000" min="0" step="0.01">
+      <div class="form-hint">Alert when item price ≤ this value</div>
+    </div>
+    <div class="form-group">
+      <label>Email To *</label>
+      <input type="email" id="alert-email" placeholder="you@gmail.com">
+      <div class="form-hint">Email address to send alert to</div>
+    </div>
+    <hr class="modal-divider">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeAlertModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAlert()">💾 Save Alert</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════
+const S = {
+  isAdmin: false,
+  currentTab: 'dashboard',
+  ahPage: 1,
+  txPage: 1,
+  lbPage: 1,
+  histPage: 1,
+  shieldTab: 'metrics',
+  dashInterval: null
+};
+
+// ═══════════════════════════════════════════════════════════════
+// Toast
+// ═══════════════════════════════════════════════════════════════
+function toast(msg, type='info') {
+  const icons = { success:'✅', error:'❌', info:'ℹ️', warn:'⚠️' };
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span> ${msg}`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// API Helper
+// ═══════════════════════════════════════════════════════════════
+async function api(path, options={}) {
+  try {
+    const res = await fetch(path, {
+      headers: {'Content-Type':'application/json'},
+      ...options
+    });
+    const data = await res.json();
+    return { ok: res.ok, status: res.status, data };
+  } catch(e) {
+    return { ok: false, status: 0, data: { error: e.message } };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Auth
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('pw-input').addEventListener('keydown', e => {
+  if(e.key==='Enter') doLogin();
+});
+
+async function doLogin() {
+  const pw = document.getElementById('pw-input').value;
+  const err = document.getElementById('login-error');
+  err.textContent = '';
+  const r = await api('/api/auth/login', {
+    method:'POST', body: JSON.stringify({password: pw})
+  });
+  if(r.ok && r.data.success) {
+    S.isAdmin = r.data.role === 'admin';
+    showApp();
+  } else {
+    err.textContent = r.data.error || 'Invalid password';
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+
+async function doLogout() {
+  await api('/api/auth/logout', {method:'POST'});
+  location.reload();
+}
+
+async function checkAuth() {
+  const r = await api('/api/auth/status');
+  if(r.ok && r.data.authenticated) {
+    S.isAdmin = r.data.admin;
+    showApp();
+  }
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  const app = document.getElementById('app');
+  app.classList.add('visible');
+
+  const badge = document.getElementById('role-badge');
+  if(S.isAdmin) {
+    badge.textContent = '👑 Admin';
+    badge.classList.add('admin');
+    document.getElementById('tab-shield').classList.remove('hidden');
+  } else {
+    badge.textContent = '👤 User';
+  }
+
+  switchTab('dashboard');
+  startPollIndicator();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Tab Navigation
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('nav-tabs').addEventListener('click', e => {
+  const tab = e.target.closest('.nav-tab');
+  if(!tab) return;
+  const name = tab.dataset.tab;
+  if(name === 'shield' && !S.isAdmin) { toast('Admin access required', 'error'); return; }
+  switchTab(name);
+});
+
+function switchTab(name) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${name}`));
+  S.currentTab = name;
+
+  if(S.dashInterval) clearInterval(S.dashInterval);
+
+  switch(name) {
+    case 'dashboard':
+      loadDashboard();
+      S.dashInterval = setInterval(loadDashboard, 15000);
+      break;
+    case 'auction': loadAuction(1); break;
+    case 'transactions': loadTransactions(1); break;
+    case 'leaderboards': loadLeaderboard(1); break;
+    case 'alerts': loadAlerts(); loadAlertHistory(1); break;
+    case 'settings': loadSettings(); break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Poll Indicator
+// ═══════════════════════════════════════════════════════════════
+function startPollIndicator() {
+  setInterval(async () => {
+    const r = await api('/api/dashboard/status');
+    const dot = document.getElementById('poll-dot');
+    const label = document.getElementById('poll-label');
+    if(r.ok && r.data.last_poll) {
+      const lp = r.data.last_poll;
+      if(lp.error) {
+        dot.classList.add('error');
+        label.textContent = 'Poll error';
+      } else {
+        dot.classList.remove('error');
+        const t = lp.time ? new Date(lp.time) : null;
+        const secs = t ? Math.floor((Date.now() - t)/1000) : '?';
+        label.textContent = `Polled ${secs}s ago · ${lp.items} items`;
+      }
+      // Update dash stats if visible
+      if(S.currentTab === 'dashboard') {
+        document.getElementById('d-items').textContent = r.data.snapshot_count ?? '—';
+        document.getElementById('d-active').textContent = r.data.active_alerts ?? '—';
+        document.getElementById('d-triggered').textContent = r.data.history_count ?? '—';
+        const lastT = r.data.last_poll?.time ? new Date(r.data.last_poll.time).toLocaleTimeString() : '—';
+        document.getElementById('d-last-poll').textContent = lastT;
+      }
+    }
+  }, 10000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Dashboard
+// ═══════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  const r = await api('/api/dashboard/status');
+  if(!r.ok) return;
+  const d = r.data;
+
+  document.getElementById('d-items').textContent = d.snapshot_count ?? '—';
+  document.getElementById('d-active').textContent = d.active_alerts ?? '—';
+  document.getElementById('d-triggered').textContent = d.history_count ?? '—';
+  const lastT = d.last_poll?.time ? new Date(d.last_poll.time).toLocaleTimeString() : '—';
+  document.getElementById('d-last-poll').textContent = lastT;
+
+  // Recent history
+  const histEl = document.getElementById('dash-history');
+  if(!d.recent_history?.length) {
+    histEl.innerHTML = `<div class="empty-state"><div class="empty-icon">😴</div><div class="empty-text">No alerts triggered yet</div></div>`;
+  } else {
+    histEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">` +
+      d.recent_history.map(h => `
+        <div style="padding:10px 12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-weight:600;font-size:13px">${esc(h.alert_name)}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">${esc(h.message)}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">${fmtTime(h.triggered_at)}</div>
+        </div>
+      `).join('') + `</div>`;
+  }
+
+  // Poll log
+  const pollEl = document.getElementById('dash-polllog');
+  if(!d.poll_logs?.length) {
+    pollEl.innerHTML = `<div class="empty-state"><div class="empty-icon">📡</div><div class="empty-text">No poll data yet</div></div>`;
+  } else {
+    pollEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px">` +
+      d.poll_logs.slice(0,8).map(p => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg3);border-radius:6px;font-size:12px">
+          <span style="color:var(--text2)">${new Date(p.polled_at).toLocaleTimeString()}</span>
+          <span>${p.items_found} items</span>
+          ${p.alerts_triggered > 0 ? `<span class="badge badge-orange">⚡${p.alerts_triggered}</span>` : `<span class="badge badge-green">✓</span>`}
+          ${p.error ? `<span class="badge badge-red">Error</span>` : ''}
+        </div>
+      `).join('') + `</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Auction House
+// ═══════════════════════════════════════════════════════════════
+async function loadAuction(page) {
+  S.ahPage = page;
+  document.getElementById('ah-results').innerHTML = `<div class="loading"><div class="spinner"></div>Loading...</div>`;
+
+  const search = document.getElementById('ah-search').value.trim();
+  const sort = document.getElementById('ah-sort').value;
+
+  let r;
+  if(search || sort) {
+    const body = {};
+    if(search) body.search = search;
+    if(sort) body.sort = sort;
+    r = await api(`/api/auction/list/${page}`, {method:'POST', body: JSON.stringify(body)});
+  } else {
+    r = await api(`/api/auction/list/${page}`);
+  }
+
+  const el = document.getElementById('ah-results');
+  if(!r.ok || !r.data.result) {
+    el.innerHTML = errBox(r.data.error || r.data.message || 'Failed to load');
+    return;
+  }
+  const items = r.data.result;
+  if(!items.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">No items found</div><div class="empty-sub">Try a different search</div></div>`;
+    document.getElementById('ah-pagination').innerHTML = '';
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Item</th><th>Count</th><th>Enchantments</th>
+          <th>Price</th><th>Seller</th><th>Time Left</th>
+        </tr></thead>
+        <tbody>
+          ${items.map(i => {
+            const enchants = fmtEnchants(i.item.enchants);
+            const tl = fmtTimeLeft(i.time_left);
+            const tlClass = i.time_left < 3600000 ? 'urgent' : i.time_left < 86400000 ? 'soon' : '';
+            return `<tr>
+              <td><strong>${esc(i.item.display_name)}</strong>
+                ${i.item.lore?.length ? `<div style="font-size:11px;color:var(--text3)">${esc(i.item.lore[0])}</div>` : ''}
+              </td>
+              <td class="td-muted">${i.item.count}</td>
+              <td>${enchants || '<span class="td-muted">—</span>'}</td>
+              <td class="td-price">$${Number(i.price).toLocaleString()}</td>
+              <td class="td-muted">${esc(i.seller.name)}</td>
+              <td><span class="time-left ${tlClass}">${tl}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('ah-pagination').innerHTML = pagination(page, items.length === 10, () => loadAuction(page-1), () => loadAuction(page+1));
+}
+
+function clearAuctionSearch() {
+  document.getElementById('ah-search').value = '';
+  document.getElementById('ah-sort').value = '';
+  loadAuction(1);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Transactions
+// ═══════════════════════════════════════════════════════════════
+async function loadTransactions(page) {
+  S.txPage = page;
+  document.getElementById('tx-results').innerHTML = `<div class="loading"><div class="spinner"></div>Loading...</div>`;
+
+  const r = await api(`/api/auction/transactions/${page}`);
+  const el = document.getElementById('tx-results');
+
+  if(!r.ok || !r.data.result) {
+    el.innerHTML = errBox(r.data.error || r.data.message || 'Failed to load');
+    return;
+  }
+  const items = r.data.result;
+  if(!items.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">No transactions on this page</div></div>`;
+    document.getElementById('tx-pagination').innerHTML = '';
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Item</th><th>Count</th><th>Enchantments</th>
+          <th>Price</th><th>Seller</th><th>Date Sold</th>
+        </tr></thead>
+        <tbody>
+          ${items.map(i => {
+            const enchants = fmtEnchants(i.item.enchants);
+            const sold = i.unixMillisDateSold ? new Date(i.unixMillisDateSold).toLocaleString() : '—';
+            return `<tr>
+              <td><strong>${esc(i.item.display_name)}</strong></td>
+              <td class="td-muted">${i.item.count}</td>
+              <td>${enchants || '<span class="td-muted">—</span>'}</td>
+              <td class="td-price">$${Number(i.price).toLocaleString()}</td>
+              <td class="td-muted">${esc(i.seller.name)}</td>
+              <td class="td-muted" style="font-size:12px">${sold}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('tx-pagination').innerHTML = pagination(page, page < 10 && items.length === 100, () => loadTransactions(page-1), () => loadTransactions(page+1));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Leaderboards
+// ═══════════════════════════════════════════════════════════════
+const LB_ICONS = {
+  money:'💰', kills:'⚔️', deaths:'💀', mobskilled:'🧟',
+  brokenblocks:'⛏️', placedblocks:'🧱', playtime:'⏱️',
+  shards:'💎', sell:'🛒', shop:'🏪'
+};
+
+async function loadLeaderboard(page) {
+  S.lbPage = page;
+  document.getElementById('lb-results').innerHTML = `<div class="loading"><div class="spinner"></div>Loading...</div>`;
+
+  const type = document.getElementById('lb-type').value;
+  const r = await api(`/api/leaderboards/${type}/${page}`);
+  const el = document.getElementById('lb-results');
+
+  if(!r.ok || !r.data.result) {
+    el.innerHTML = errBox(r.data.error || r.data.message || 'Failed to load');
+    return;
+  }
+  const items = r.data.result;
+  const baseRank = (page - 1) * 10;
+
+  el.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Username</th><th>${LB_ICONS[type]||''} Value</th></tr></thead>
+        <tbody>
+          ${items.map((i, idx) => {
+            const rank = baseRank + idx + 1;
+            const medal = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':'';
+            return `<tr>
+              <td class="td-rank">${medal || rank}</td>
+              <td><strong>${esc(i.username)}</strong></td>
+              <td class="td-price">${esc(i.value)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('lb-pagination').innerHTML = pagination(page, items.length >= 10, () => loadLeaderboard(page-1), () => loadLeaderboard(page+1));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Player Lookup
+// ═══════════════════════════════════════════════════════════════
+async function doLookup() {
+  const user = document.getElementById('lookup-user').value.trim();
+  if(!user) { toast('Enter a username', 'warn'); return; }
+  document.getElementById('lookup-result').innerHTML = `<div class="loading"><div class="spinner"></div>Looking up ${user}...</div>`;
+
+  const r = await api(`/api/lookup/${encodeURIComponent(user)}`);
+  const el = document.getElementById('lookup-result');
+
+  if(!r.ok || !r.data.result) {
+    el.innerHTML = errBox(r.data.error || r.data.message || 'Player not found');
+    return;
+  }
+  const d = r.data.result;
+  el.innerHTML = `
+    <div class="player-card">
+      <div class="player-card-header">
+        <div class="player-avatar">👤</div>
+        <div>
+          <div class="player-name">${esc(d.username)}</div>
+          <div class="player-rank">${esc(d.rank || 'Member')}</div>
+        </div>
+      </div>
+      <div class="stats-list">
+        <div class="stat-row">
+          <div class="stat-row-label">Rank</div>
+          <div class="stat-row-value" style="color:var(--yellow)">${esc(d.rank || '—')}</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-row-label">Current Location</div>
+          <div class="stat-row-value" style="color:var(--blue)">${esc(d.location || '—')}</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="document.getElementById('stats-user').value='${esc(d.username)}';switchTab('stats');doStats()">📊 View Stats</button>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Player Stats
+// ═══════════════════════════════════════════════════════════════
+const STAT_META = [
+  { key:'money',              label:'💰 Money',          color:'var(--green)' },
+  { key:'shards',             label:'💎 Shards',          color:'var(--purple)' },
+  { key:'kills',              label:'⚔️ Kills',           color:'var(--red)' },
+  { key:'deaths',             label:'💀 Deaths',          color:'var(--text2)' },
+  { key:'mobs_killed',        label:'🧟 Mobs Killed',     color:'var(--yellow)' },
+  { key:'broken_blocks',      label:'⛏️ Blocks Broken',   color:'var(--accent)' },
+  { key:'placed_blocks',      label:'🧱 Blocks Placed',   color:'var(--blue)' },
+  { key:'playtime',           label:'⏱️ Playtime',        color:'var(--accent2)' },
+  { key:'money_made_from_sell',   label:'🛒 Revenue (Sell)',   color:'var(--green)' },
+  { key:'money_spent_on_shop',    label:'🏪 Spent (Shop)',     color:'var(--red)' },
+];
+
+async function doStats() {
+  const user = document.getElementById('stats-user').value.trim();
+  if(!user) { toast('Enter a username', 'warn'); return; }
+  document.getElementById('stats-result').innerHTML = `<div class="loading"><div class="spinner"></div>Loading stats for ${user}...</div>`;
+
+  const r = await api(`/api/stats/${encodeURIComponent(user)}`);
+  const el = document.getElementById('stats-result');
+
+  if(!r.ok || !r.data.result) {
+    el.innerHTML = errBox(r.data.error || r.data.message || 'Player not found');
+    return;
+  }
+  const d = r.data.result;
+  el.innerHTML = `
+    <div class="player-card">
+      <div class="player-card-header">
+        <div class="player-avatar">📊</div>
+        <div>
+          <div class="player-name">${esc(user)}</div>
+          <div class="player-rank">Full Statistics</div>
+        </div>
+      </div>
+      <div class="stats-list">
+        ${STAT_META.map(m => `
+          <div class="stat-row">
+            <div class="stat-row-label">${m.label}</div>
+            <div class="stat-row-value" style="color:${m.color}">${esc(d[m.key] ?? '—')}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Shield (Admin)
+// ═══════════════════════════════════════════════════════════════
+function setShieldTab(name) {
+  S.shieldTab = name;
+  document.querySelectorAll('.sub-tab').forEach(t => t.classList.toggle('active', t.dataset.shield === name));
+  document.querySelectorAll('.shield-panel').forEach(p => p.style.display = p.id === `shield-panel-${name}` ? '' : 'none');
+}
+
+async function loadShieldData() {
+  const svc = document.getElementById('shield-service').value.trim();
+  if(!svc) { toast('Enter a Service ID', 'warn'); return; }
+
+  const loads = [
+    loadShieldSection('metrics', `/api/shield/metrics/${encodeURIComponent(svc)}`, 'shield-panel-metrics'),
+    loadShieldSection('stats', `/api/shield/stats/${encodeURIComponent(svc)}`, 'shield-panel-stats'),
+    loadShieldConfigSection('bedrock', svc),
+    loadShieldConfigSection('java', svc)
+  ];
+  await Promise.all(loads);
+  toast('Shield data loaded', 'success');
+}
+
+async function loadShieldSection(name, url, panelId) {
+  const el = document.getElementById(panelId);
+  el.innerHTML = `<div class="loading"><div class="spinner"></div>Loading ${name}...</div>`;
+  const r = await api(url);
+  if(!r.ok) {
+    el.innerHTML = errBox(r.data.error || r.data.message || 'Failed');
+    return;
+  }
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">${name.toUpperCase()}</div>
+      <pre class="json-display">${JSON.stringify(r.data, null, 2)}</pre>
+    </div>`;
+}
+
+async function loadShieldConfigSection(type, svc) {
+  const panelId = `shield-panel-${type}`;
+  const el = document.getElementById(panelId);
+  el.innerHTML = `<div class="loading"><div class="spinner"></div>Loading config...</div>`;
+  const r = await api(`/api/shield/${type}/config/${encodeURIComponent(svc)}`);
+  if(!r.ok) { el.innerHTML = errBox(r.data.error || r.data.message || 'Failed'); return; }
+  const cfg = JSON.stringify(r.data, null, 2);
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">${type.toUpperCase()} CONFIG — ${esc(svc)}</div>
+      <div class="form-group">
+        <label>Configuration JSON</label>
+        <textarea id="shield-${type}-cfg" style="min-height:160px;font-family:monospace;font-size:12px">${esc(cfg)}</textarea>
+      </div>
+      <button class="btn btn-purple" onclick="updateShieldConfig('${type}', '${esc(svc)}')">💾 Update Config</button>
+    </div>`;
+}
+
+async function updateShieldConfig(type, svc) {
+  const raw = document.getElementById(`shield-${type}-cfg`).value;
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch(e) { toast('Invalid JSON', 'error'); return; }
+  const r = await api(`/api/shield/${type}/config/${encodeURIComponent(svc)}`, {
+    method: 'PUT', body: JSON.stringify(parsed)
+  });
+  if(r.ok) { toast('Config updated!', 'success'); }
+  else { toast(r.data.error || 'Update failed', 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Alerts
+// ═══════════════════════════════════════════════════════════════
+const ALERT_ICONS = {
+  price_drop: '💰', price_decrease: '📉',
+  seller_alert: '👤', new_item_listing: '🆕', any_new_listing: '📦'
+};
+const ALERT_LABELS = {
+  price_drop: 'Price Drop', price_decrease: 'Price Decrease',
+  seller_alert: 'Seller Alert', new_item_listing: 'New Item Listing', any_new_listing: 'Any New Listing'
+};
+
+async function loadAlerts() {
+  const r = await api('/api/alerts');
+  const el = document.getElementById('alerts-list');
+  if(!r.ok) { el.innerHTML = errBox('Failed to load alerts'); return; }
+  const alerts = r.data;
+  if(!alerts.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🔕</div><div class="empty-text">No alerts configured</div><div class="empty-sub">Click "New Alert" to get started</div></div>`;
+    return;
+  }
+  el.innerHTML = `<div class="alert-list">` +
+    alerts.map(a => {
+      const meta = [];
+      if(a.search_term) meta.push(`Search: <strong>${esc(a.search_term)}</strong>`);
+      if(a.seller_name) meta.push(`Seller: <strong>${esc(a.seller_name)}</strong>`);
+      if(a.threshold_price) meta.push(`Threshold: <strong>$${Number(a.threshold_price).toLocaleString()}</strong>`);
+      meta.push(`Email: ${esc(a.email_to)}`);
+      if(a.last_triggered) meta.push(`Last: ${fmtTime(a.last_triggered)}`);
+      return `
+        <div class="alert-card ${a.enabled ? '' : 'disabled'}">
+          <div class="alert-icon">${ALERT_ICONS[a.type]||'🔔'}</div>
+          <div class="alert-info">
+            <div class="alert-name">${esc(a.name)} <span class="badge badge-${a.enabled?'green':'red'}">${a.enabled?'ON':'OFF'}</span></div>
+            <div class="alert-meta">
+              <span class="badge badge-blue">${ALERT_LABELS[a.type]||a.type}</span>
+              ${meta.join(' · ')}
+            </div>
+          </div>
+          <div class="alert-actions">
+            <button class="btn btn-secondary" onclick="editAlert(${a.id})" title="Edit">✏️</button>
+            <button class="btn ${a.enabled?'btn-danger':'btn-success'}" onclick="toggleAlert(${a.id})" title="Toggle">${a.enabled?'⏸':'▶'}</button>
+            <button class="btn btn-danger" onclick="deleteAlert(${a.id})" title="Delete">🗑</button>
+          </div>
+        </div>`;
+    }).join('') + `</div>`;
+}
+
+async function loadAlertHistory(page) {
+  S.histPage = page;
+  const r = await api(`/api/alerts/history?page=${page}`);
+  const el = document.getElementById('alerts-history');
+  if(!r.ok) { el.innerHTML = errBox('Failed to load history'); return; }
+  const { history, total } = r.data;
+  if(!history.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">😴</div><div class="empty-text">No alerts triggered yet</div></div>`;
+    document.getElementById('history-pagination').innerHTML = '';
+    return;
+  }
+  el.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Alert</th><th>Item</th><th>Price</th><th>Seller</th><th>Message</th><th>Time</th></tr></thead>
+        <tbody>
+          ${history.map(h => `<tr>
+            <td><strong>${esc(h.alert_name)}</strong></td>
+            <td>${esc(h.item_name||'—')}</td>
+            <td class="td-price">${h.price ? '$'+Number(h.price).toLocaleString() : '—'}</td>
+            <td class="td-muted">${esc(h.seller||'—')}</td>
+            <td class="td-muted" style="font-size:12px;max-width:200px">${esc(h.message)}</td>
+            <td class="td-muted" style="font-size:12px">${fmtTime(h.triggered_at)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  const totalPages = Math.ceil(total / 25);
+  document.getElementById('history-pagination').innerHTML = pagination(page, page < totalPages, () => loadAlertHistory(page-1), () => loadAlertHistory(page+1));
+}
+
+async function toggleAlert(id) {
+  const r = await api(`/api/alerts/${id}/toggle`, {method:'POST'});
+  if(r.ok) { toast('Alert toggled', 'success'); loadAlerts(); }
+  else toast('Failed to toggle', 'error');
+}
+
+async function deleteAlert(id) {
+  if(!confirm('Delete this alert? This will also clear its history.')) return;
+  const r = await api(`/api/alerts/${id}`, {method:'DELETE'});
+  if(r.ok) { toast('Alert deleted', 'success'); loadAlerts(); loadAlertHistory(1); }
+  else toast('Failed to delete', 'error');
+}
+
+async function clearHistory() {
+  if(!confirm('Clear all alert history?')) return;
+  const r = await api('/api/alerts/history/clear', {method:'DELETE'});
+  if(r.ok) { toast('History cleared', 'success'); loadAlertHistory(1); loadDashboard(); }
+  else toast('Failed to clear', 'error');
+}
+
+// Alert Modal
+function openAlertModal(prefill={}) {
+  document.getElementById('alert-edit-id').value = '';
+  document.getElementById('alert-name').value = prefill.name || '';
+  document.getElementById('alert-type').value = prefill.type || 'price_drop';
+  document.getElementById('alert-search').value = prefill.search_term || '';
+  document.getElementById('alert-seller').value = prefill.seller_name || '';
+  document.getElementById('alert-threshold').value = prefill.threshold_price || '';
+  document.getElementById('alert-email').value = prefill.email_to || '';
+  document.getElementById('modal-title-text').textContent = 'Create Alert';
+  updateAlertForm();
+  document.getElementById('alert-modal').classList.remove('hidden');
+}
+
+async function editAlert(id) {
+  const r = await api('/api/alerts');
+  if(!r.ok) return;
+  const alert = r.data.find(a => a.id === id);
+  if(!alert) return;
+  document.getElementById('alert-edit-id').value = id;
+  document.getElementById('alert-name').value = alert.name;
+  document.getElementById('alert-type').value = alert.type;
+  document.getElementById('alert-search').value = alert.search_term || '';
+  document.getElementById('alert-seller').value = alert.seller_name || '';
+  document.getElementById('alert-threshold').value = alert.threshold_price || '';
+  document.getElementById('alert-email').value = alert.email_to;
+  document.getElementById('modal-title-text').textContent = 'Edit Alert';
+  updateAlertForm();
+  document.getElementById('alert-modal').classList.remove('hidden');
+}
+
+function closeAlertModal() {
+  document.getElementById('alert-modal').classList.add('hidden');
+}
+
+function updateAlertForm() {
+  const type = document.getElementById('alert-type').value;
+  const needsSearch = ['price_drop', 'price_decrease', 'new_item_listing'].includes(type);
+  const needsSeller = type === 'seller_alert';
+  const needsThreshold = type === 'price_drop';
+  document.getElementById('field-search').style.display = needsSearch ? '' : 'none';
+  document.getElementById('field-seller').style.display = needsSeller ? '' : 'none';
+  document.getElementById('field-threshold').style.display = needsThreshold ? '' : 'none';
+}
+
+async function saveAlert() {
+  const editId = document.getElementById('alert-edit-id').value;
+  const body = {
+    name: document.getElementById('alert-name').value.trim(),
+    type: document.getElementById('alert-type').value,
+    search_term: document.getElementById('alert-search').value.trim() || null,
+    seller_name: document.getElementById('alert-seller').value.trim() || null,
+    threshold_price: parseFloat(document.getElementById('alert-threshold').value) || null,
+    email_to: document.getElementById('alert-email').value.trim()
+  };
+  if(!body.name || !body.type || !body.email_to) { toast('Name, type and email are required', 'warn'); return; }
+
+  let r;
+  if(editId) {
+    r = await api(`/api/alerts/${editId}`, {method:'PUT', body: JSON.stringify(body)});
+  } else {
+    r = await api('/api/alerts', {method:'POST', body: JSON.stringify(body)});
+  }
+  if(r.ok) {
+    toast(editId ? 'Alert updated!' : 'Alert created!', 'success');
+    closeAlertModal();
+    loadAlerts();
+  } else {
+    toast(r.data.error || 'Failed to save alert', 'error');
+  }
+}
+
+// Close modal on overlay click
+document.getElementById('alert-modal').addEventListener('click', e => {
+  if(e.target === document.getElementById('alert-modal')) closeAlertModal();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Settings
+// ═══════════════════════════════════════════════════════════════
+async function loadSettings() {
+  const r = await api('/api/settings/info');
+  const el = document.getElementById('settings-info');
+  if(!r.ok) { el.innerHTML = errBox('Failed'); return; }
+  const d = r.data;
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="stat-row">
+        <div class="stat-row-label">API Key</div>
+        <div style="font-size:13px;font-family:monospace;color:var(--text);margin-top:2px">${esc(d.api_key)}</div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-row-label">SMTP Status</div>
+        <div style="margin-top:4px">
+          ${d.smtp_configured
+            ? `<span class="badge badge-green">✅ Configured — ${esc(d.smtp_username)}</span>`
+            : `<span class="badge badge-red">❌ Not Configured</span>`}
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-row-label">Poll Interval</div>
+        <div style="font-size:13px;color:var(--text);margin-top:2px">⏱ ${d.poll_interval_seconds}s</div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-row-label">API Base URL</div>
+        <div style="font-size:12px;font-family:monospace;color:var(--blue);margin-top:2px">${esc(d.api_base)}</div>
+      </div>
+    </div>`;
+}
+
+async function sendTestEmail() {
+  const email = document.getElementById('test-email-addr').value.trim();
+  if(!email) { toast('Enter an email address', 'warn'); return; }
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '⏳ Sending...';
+  const r = await api('/api/email/test', {method:'POST', body: JSON.stringify({email})});
+  btn.disabled = false; btn.textContent = '📤 Send Test Email';
+  const el = document.getElementById('test-email-result');
+  if(r.ok && r.data.success) {
+    el.innerHTML = `<span style="color:var(--green)">✅ Email sent successfully to ${esc(email)}</span>`;
+    toast('Test email sent!', 'success');
+  } else {
+    el.innerHTML = `<span style="color:var(--red)">❌ Failed: ${esc(r.data.error||'Unknown error')}</span>`;
+    toast('Email failed', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════════
+function esc(str) {
+  if(str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function errBox(msg) {
+  return `<div style="padding:20px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;color:var(--red);font-size:13px">❌ ${esc(msg)}</div>`;
+}
+
+function fmtEnchants(enchants) {
+  if(!enchants) return '';
+  try {
+    const levels = enchants.enchantments?.levels || {};
+    return Object.entries(levels)
+      .map(([k,v]) => `<span class="enchant-tag">${k} ${v}</span>`)
+      .join('');
+  } catch(e) { return ''; }
+}
+
+function fmtTimeLeft(ms) {
+  if(!ms) return '—';
+  const s = Math.floor(ms / 1000);
+  if(s < 60) return `${s}s`;
+  if(s < 3600) return `${Math.floor(s/60)}m`;
+  if(s < 86400) return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+  return `${Math.floor(s/86400)}d ${Math.floor((s%86400)/3600)}h`;
+}
+
+function fmtTime(iso) {
+  if(!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if(isNaN(d)) return iso;
+    const now = Date.now();
+    const diff = now - d.getTime();
+    if(diff < 60000) return 'Just now';
+    if(diff < 3600000) return `${Math.floor(diff/60000)}m ago`;
+    if(diff < 86400000) return `${Math.floor(diff/3600000)}h ago`;
+    return d.toLocaleDateString();
+  } catch(e) { return iso; }
+}
+
+function pagination(page, hasNext, prevFn, nextFn) {
+  return `
+    <button onclick="(${prevFn.toString()})()" ${page<=1?'disabled':''}>← Prev</button>
+    <span class="page-info">Page ${page}</span>
+    <button onclick="(${nextFn.toString()})()" ${!hasNext?'disabled':''}>Next →</button>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════════════
+checkAuth();
+</script>
+</body>
+</html>
