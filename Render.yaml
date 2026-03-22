@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: donutsmp-dashboard
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: API_KEY
+        value: pp88
+      - key: SMTP_USERNAME
+        sync: false   # Your Gmail address, e.g. you@gmail.com
+      - key: SMTP_PASSWORD
+        sync: false   # Your Gmail App Password (not your regular password)
+      - key: DASHBOARD_PASSWORD
+        sync: false   # Password for regular dashboard access
+      - key: ADMIN_PASSWORD
+        sync: false   # Password for admin access (Shield tab, etc.)
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DB_PATH
+        value: /tmp/donutsmp.db
