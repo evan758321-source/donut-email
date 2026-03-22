@@ -788,10 +788,11 @@
 const S = {
   isAdmin: false,
   currentTab: 'dashboard',
-  ahPage: 1,
-  txPage: 1,
-  lbPage: 1,
-  histPage: 1,
+  ahPage: 1,   ahHasNext: false,
+  txPage: 1,   txHasNext: false,
+  lbPage: 1,   lbHasNext: false,
+  histPage: 1, histHasNext: false,
+  histTotal: 0,
   shieldTab: 'metrics',
   dashInterval: null
 };
@@ -993,60 +994,83 @@ async function loadDashboard() {
 async function loadAuction(page) {
   S.ahPage = page;
   document.getElementById('ah-results').innerHTML = `<div class="loading"><div class="spinner"></div>Loading...</div>`;
+  document.getElementById('ah-pagination').innerHTML = '';
 
   const search = document.getElementById('ah-search').value.trim();
   const sort = document.getElementById('ah-sort').value;
 
   let r;
-  if(search || sort) {
-    const body = {};
-    if(search) body.search = search;
-    if(sort) body.sort = sort;
-    r = await api(`/api/auction/list/${page}`, {method:'POST', body: JSON.stringify(body)});
-  } else {
-    r = await api(`/api/auction/list/${page}`);
+  try {
+    if (search || sort) {
+      const body = {};
+      if (search) body.search = search;
+      if (sort) body.sort = sort;
+      r = await api(`/api/auction/list/${page}`, { method: 'POST', body: JSON.stringify(body) });
+    } else {
+      r = await api(`/api/auction/list/${page}`);
+    }
+  } catch(e) {
+    document.getElementById('ah-results').innerHTML = errBox('Network error: ' + e.message);
+    return;
   }
 
   const el = document.getElementById('ah-results');
-  if(!r.ok || !r.data.result) {
-    el.innerHTML = errBox(r.data.error || r.data.message || 'Failed to load');
+
+  if (!r.ok || !r.data.result) {
+    el.innerHTML = errBox(r.data.message || r.data.error || `Error ${r.status}`);
     return;
   }
+
   const items = r.data.result;
-  if(!items.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">No items found</div><div class="empty-sub">Try a different search</div></div>`;
-    document.getElementById('ah-pagination').innerHTML = '';
+  if (!items.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">No items found</div><div class="empty-sub">Try a different search or page</div></div>`;
     return;
   }
 
-  el.innerHTML = `
-    <div class="table-wrap">
-      <table>
-        <thead><tr>
-          <th>Item</th><th>Count</th><th>Enchantments</th>
-          <th>Price</th><th>Seller</th><th>Time Left</th>
-        </tr></thead>
-        <tbody>
-          ${items.map(i => {
-            const enchants = fmtEnchants(i.item.enchants);
-            const tl = fmtTimeLeft(i.time_left);
-            const tlClass = i.time_left < 3600000 ? 'urgent' : i.time_left < 86400000 ? 'soon' : '';
-            return `<tr>
-              <td><strong>${esc(i.item.display_name)}</strong>
-                ${i.item.lore?.length ? `<div style="font-size:11px;color:var(--text3)">${esc(i.item.lore[0])}</div>` : ''}
-              </td>
-              <td class="td-muted">${i.item.count}</td>
-              <td>${enchants || '<span class="td-muted">—</span>'}</td>
-              <td class="td-price">$${Number(i.price).toLocaleString()}</td>
-              <td class="td-muted">${esc(i.seller.name)}</td>
-              <td><span class="time-left ${tlClass}">${tl}</span></td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
+  try {
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Item</th><th>Count</th><th>Enchantments</th>
+            <th>Price</th><th>Seller</th><th>Time Left</th>
+          </tr></thead>
+          <tbody>
+            ${items.map(i => {
+              // api.Ah → item: api.Item, price: number, seller: api.Seller, time_left: integer(ms)
+              const item = i.item || {};
+              // api.Item → display_name, count, enchants: api.ItemData, lore[]
+              const name = item.display_name || item.id || 'Unknown';
+              const count = item.count || 1;
+              const lore = (item.lore || [])[0] || '';
+              // api.ItemData → enchantments: api.Enchantments { levels:{name:level} }, trim: api.Trim
+              const enchants = fmtEnchants(item.enchants);
+              const seller = (i.seller || {}).name || '—';
+              const price = i.price != null ? Number(i.price) : 0;
+              const tl = fmtTimeLeft(i.time_left);
+              const tlClass = i.time_left < 3600000 ? 'urgent' : i.time_left < 86400000 ? 'soon' : '';
+              return `<tr>
+                <td><strong>${esc(name)}</strong>${lore ? `<div style="font-size:11px;color:var(--text3)">${esc(lore)}</div>` : ''}</td>
+                <td class="td-muted">${count}</td>
+                <td>${enchants || '<span class="td-muted">—</span>'}</td>
+                <td class="td-price">$${price.toLocaleString()}</td>
+                <td class="td-muted">${esc(seller)}</td>
+                <td><span class="time-left ${tlClass}">${tl}</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
 
-  document.getElementById('ah-pagination').innerHTML = pagination(page, items.length === 10, () => loadAuction(page-1), () => loadAuction(page+1));
+    S.ahHasNext = items.length >= 10;
+    pagination('ah-pagination', page, S.ahHasNext,
+      () => loadAuction(S.ahPage - 1),
+      () => loadAuction(S.ahPage + 1)
+    );
+  } catch(e) {
+    el.innerHTML = errBox('Render error: ' + e.message);
+    console.error('Auction render error:', e);
+  }
 }
 
 function clearAuctionSearch() {
@@ -1061,46 +1085,61 @@ function clearAuctionSearch() {
 async function loadTransactions(page) {
   S.txPage = page;
   document.getElementById('tx-results').innerHTML = `<div class="loading"><div class="spinner"></div>Loading...</div>`;
+  document.getElementById('tx-pagination').innerHTML = '';
 
   const r = await api(`/api/auction/transactions/${page}`);
   const el = document.getElementById('tx-results');
 
-  if(!r.ok || !r.data.result) {
-    el.innerHTML = errBox(r.data.error || r.data.message || 'Failed to load');
+  if (!r.ok || !r.data.result) {
+    el.innerHTML = errBox(r.data.message || r.data.error || `Error ${r.status}`);
     return;
   }
   const items = r.data.result;
-  if(!items.length) {
+  if (!items.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">No transactions on this page</div></div>`;
-    document.getElementById('tx-pagination').innerHTML = '';
     return;
   }
 
-  el.innerHTML = `
-    <div class="table-wrap">
-      <table>
-        <thead><tr>
-          <th>Item</th><th>Count</th><th>Enchantments</th>
-          <th>Price</th><th>Seller</th><th>Date Sold</th>
-        </tr></thead>
-        <tbody>
-          ${items.map(i => {
-            const enchants = fmtEnchants(i.item.enchants);
-            const sold = i.unixMillisDateSold ? new Date(i.unixMillisDateSold).toLocaleString() : '—';
-            return `<tr>
-              <td><strong>${esc(i.item.display_name)}</strong></td>
-              <td class="td-muted">${i.item.count}</td>
-              <td>${enchants || '<span class="td-muted">—</span>'}</td>
-              <td class="td-price">$${Number(i.price).toLocaleString()}</td>
-              <td class="td-muted">${esc(i.seller.name)}</td>
-              <td class="td-muted" style="font-size:12px">${sold}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
+  try {
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Item</th><th>Count</th><th>Enchantments</th>
+            <th>Price</th><th>Seller</th><th>Date Sold</th>
+          </tr></thead>
+          <tbody>
+            ${items.map(i => {
+              // api.PurchaseItem → item: api.Item, price, seller: api.Seller, unixMillisDateSold
+              const item = i.item || {};
+              const name = item.display_name || item.id || 'Unknown';
+              const count = item.count || 1;
+              const enchants = fmtEnchants(item.enchants);
+              const seller = (i.seller || {}).name || '—';
+              const price = i.price != null ? Number(i.price) : 0;
+              const sold = i.unixMillisDateSold ? new Date(i.unixMillisDateSold).toLocaleString() : '—';
+              return `<tr>
+                <td><strong>${esc(name)}</strong></td>
+                <td class="td-muted">${count}</td>
+                <td>${enchants || '<span class="td-muted">—</span>'}</td>
+                <td class="td-price">$${price.toLocaleString()}</td>
+                <td class="td-muted">${esc(seller)}</td>
+                <td class="td-muted" style="font-size:12px">${sold}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
 
-  document.getElementById('tx-pagination').innerHTML = pagination(page, page < 10 && items.length === 100, () => loadTransactions(page-1), () => loadTransactions(page+1));
+    S.txHasNext = page < 10 && items.length >= 100;
+    pagination('tx-pagination', page, S.txHasNext,
+      () => loadTransactions(S.txPage - 1),
+      () => loadTransactions(S.txPage + 1)
+    );
+  } catch(e) {
+    el.innerHTML = errBox('Render error: ' + e.message);
+    console.error('Transaction render error:', e);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1115,37 +1154,52 @@ const LB_ICONS = {
 async function loadLeaderboard(page) {
   S.lbPage = page;
   document.getElementById('lb-results').innerHTML = `<div class="loading"><div class="spinner"></div>Loading...</div>`;
+  document.getElementById('lb-pagination').innerHTML = '';
 
   const type = document.getElementById('lb-type').value;
   const r = await api(`/api/leaderboards/${type}/${page}`);
   const el = document.getElementById('lb-results');
 
-  if(!r.ok || !r.data.result) {
-    el.innerHTML = errBox(r.data.error || r.data.message || 'Failed to load');
+  if (!r.ok || !r.data.result) {
+    el.innerHTML = errBox(r.data.message || r.data.error || `Error ${r.status}`);
     return;
   }
   const items = r.data.result;
-  const baseRank = (page - 1) * 10;
+  if (!items.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🏆</div><div class="empty-text">No data on this page</div></div>`;
+    return;
+  }
 
-  el.innerHTML = `
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>#</th><th>Username</th><th>${LB_ICONS[type]||''} Value</th></tr></thead>
-        <tbody>
-          ${items.map((i, idx) => {
-            const rank = baseRank + idx + 1;
-            const medal = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':'';
-            return `<tr>
-              <td class="td-rank">${medal || rank}</td>
-              <td><strong>${esc(i.username)}</strong></td>
-              <td class="td-price">${esc(i.value)}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
+  try {
+    const baseRank = (page - 1) * 10;
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Username</th><th>${LB_ICONS[type] || ''} Value</th></tr></thead>
+          <tbody>
+            ${items.map((i, idx) => {
+              // api.Leaderboard → username, uuid, value (all strings)
+              const rank = baseRank + idx + 1;
+              const medal = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':'';
+              return `<tr>
+                <td class="td-rank">${medal || rank}</td>
+                <td><strong>${esc(i.username || '—')}</strong></td>
+                <td class="td-price">${esc(i.value || '—')}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
 
-  document.getElementById('lb-pagination').innerHTML = pagination(page, items.length >= 10, () => loadLeaderboard(page-1), () => loadLeaderboard(page+1));
+    S.lbHasNext = items.length >= 10;
+    pagination('lb-pagination', page, S.lbHasNext,
+      () => loadLeaderboard(S.lbPage - 1),
+      () => loadLeaderboard(S.lbPage + 1)
+    );
+  } catch(e) {
+    el.innerHTML = errBox('Render error: ' + e.message);
+    console.error('Leaderboard render error:', e);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1356,9 +1410,10 @@ async function loadAlertHistory(page) {
   S.histPage = page;
   const r = await api(`/api/alerts/history?page=${page}`);
   const el = document.getElementById('alerts-history');
-  if(!r.ok) { el.innerHTML = errBox('Failed to load history'); return; }
+  if (!r.ok) { el.innerHTML = errBox('Failed to load history'); return; }
   const { history, total } = r.data;
-  if(!history.length) {
+  S.histTotal = total || 0;
+  if (!history || !history.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">😴</div><div class="empty-text">No alerts triggered yet</div></div>`;
     document.getElementById('history-pagination').innerHTML = '';
     return;
@@ -1370,9 +1425,9 @@ async function loadAlertHistory(page) {
         <tbody>
           ${history.map(h => `<tr>
             <td><strong>${esc(h.alert_name)}</strong></td>
-            <td>${esc(h.item_name||'—')}</td>
-            <td class="td-price">${h.price ? '$'+Number(h.price).toLocaleString() : '—'}</td>
-            <td class="td-muted">${esc(h.seller||'—')}</td>
+            <td>${esc(h.item_name || '—')}</td>
+            <td class="td-price">${h.price ? '$' + Number(h.price).toLocaleString() : '—'}</td>
+            <td class="td-muted">${esc(h.seller || '—')}</td>
             <td class="td-muted" style="font-size:12px;max-width:200px">${esc(h.message)}</td>
             <td class="td-muted" style="font-size:12px">${fmtTime(h.triggered_at)}</td>
           </tr>`).join('')}
@@ -1380,8 +1435,12 @@ async function loadAlertHistory(page) {
       </table>
     </div>`;
 
-  const totalPages = Math.ceil(total / 25);
-  document.getElementById('history-pagination').innerHTML = pagination(page, page < totalPages, () => loadAlertHistory(page-1), () => loadAlertHistory(page+1));
+  const totalPages = Math.ceil(S.histTotal / 25);
+  S.histHasNext = page < totalPages;
+  pagination('history-pagination', page, S.histHasNext,
+    () => loadAlertHistory(S.histPage - 1),
+    () => loadAlertHistory(S.histPage + 1)
+  );
 }
 
 async function toggleAlert(id) {
@@ -1543,12 +1602,17 @@ function errBox(msg) {
   return `<div style="padding:20px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;color:var(--red);font-size:13px">❌ ${esc(msg)}</div>`;
 }
 
-function fmtEnchants(enchants) {
-  if(!enchants) return '';
+function fmtEnchants(itemData) {
+  // itemData is api.ItemData = { enchantments: api.Enchantments { levels: {name: level} }, trim: api.Trim }
+  if (!itemData) return '';
   try {
-    const levels = enchants.enchantments?.levels || {};
-    return Object.entries(levels)
-      .map(([k,v]) => `<span class="enchant-tag">${k} ${v}</span>`)
+    // levels is a plain object: { "sharpness": 5, "fire_aspect": 2, ... }
+    const levels = itemData.enchantments?.levels;
+    if (!levels || typeof levels !== 'object') return '';
+    const entries = Object.entries(levels);
+    if (!entries.length) return '';
+    return entries
+      .map(([k, v]) => `<span class="enchant-tag">${esc(k)} ${v}</span>`)
       .join('');
   } catch(e) { return ''; }
 }
@@ -1576,11 +1640,18 @@ function fmtTime(iso) {
   } catch(e) { return iso; }
 }
 
-function pagination(page, hasNext, prevFn, nextFn) {
-  return `
-    <button onclick="(${prevFn.toString()})()" ${page<=1?'disabled':''}>← Prev</button>
+// ═══════════════════════════════════════════════════════════════
+// Pagination — state-based, no function serialization
+// ═══════════════════════════════════════════════════════════════
+function pagination(elId, page, hasNext, onPrev, onNext) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = `
+    <button id="${elId}-prev" ${page <= 1 ? 'disabled' : ''}>← Prev</button>
     <span class="page-info">Page ${page}</span>
-    <button onclick="(${nextFn.toString()})()" ${!hasNext?'disabled':''}>Next →</button>`;
+    <button id="${elId}-next" ${!hasNext ? 'disabled' : ''}>Next →</button>`;
+  if (page > 1) el.querySelector(`#${elId}-prev`).addEventListener('click', onPrev);
+  if (hasNext)  el.querySelector(`#${elId}-next`).addEventListener('click', onNext);
 }
 
 // ═══════════════════════════════════════════════════════════════
