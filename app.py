@@ -150,11 +150,18 @@ def build_email_html(title, rows, extra=""):
 # ─── API Helpers ──────────────────────────────────────────────────────────────
 def api_get(path, json_body=None):
     try:
-        kwargs = {"headers": API_HEADERS, "timeout": 10}
+        url = f"{API_BASE}{path}"
         if json_body:
-            kwargs["json"] = json_body
-        r = requests.get(f"{API_BASE}{path}", **kwargs)
-        return r.json(), r.status_code
+            # Some servers ignore GET body — send as POST-style GET with data kwarg
+            r = requests.get(url, headers=API_HEADERS, json=json_body, timeout=15)
+        else:
+            r = requests.get(url, headers=API_HEADERS, timeout=15)
+        try:
+            return r.json(), r.status_code
+        except Exception:
+            return {"error": f"Non-JSON response (status {r.status_code})", "raw": r.text[:200]}, r.status_code
+    except requests.exceptions.Timeout:
+        return {"error": "Request timed out", "status": 504}, 504
     except Exception as e:
         return {"error": str(e), "status": 500}, 500
 
