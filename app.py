@@ -1,12 +1,9 @@
 import os
 import sqlite3
-import smtplib
 import threading
 import time
 import json
 import requests
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, render_template, session
 from functools import wraps
@@ -18,10 +15,16 @@ app.permanent_session_lifetime = timedelta(hours=12)
 # ─── Configuration ────────────────────────────────────────────────────────────
 API_KEY = os.environ.get("API_KEY", "pp88")
 API_BASE = "https://api.donutsmp.net"
-SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
-SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+
+# Resend — get a free API key at https://resend.com
+# Set RESEND_API_KEY in your environment, and RESEND_FROM_EMAIL to a verified sender.
+# During testing you can use "onboarding@resend.dev" as the from address (sends to
+# your own account email only). Once you verify a domain you can send to anyone.
+RESEND_API_KEY   = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM      = os.environ.get("RESEND_FROM_EMAIL", "DonutSMP <onboarding@resend.dev>")
+
 DASHBOARD_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+ADMIN_PASSWORD     = os.environ.get("ADMIN_PASSWORD", "")
 
 API_HEADERS = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
 
@@ -105,26 +108,48 @@ def require_admin(f):
         return f(*args, **kwargs)
     return decorated
 
-# ─── Email ────────────────────────────────────────────────────────────────────
+# ─── Email via Resend ─────────────────────────────────────────────────────────
 def send_email(to_addr, subject, html_body):
-    if not SMTP_USERNAME or not SMTP_PASSWORD:
-        print("[EMAIL] SMTP not configured, skipping email")
-        return False, "SMTP not configured"
+    """Send an email using the Resend REST API (https://resend.com).
+
+    Free tier: 3,000 emails/month, 100/day.
+    Requires:
+        RESEND_API_KEY   — your Resend API key (re_xxxx...)
+        RESEND_FROM      — verified sender, e.g. "DonutSMP <alerts@yourdomain.com>"
+                          During testing use "onboarding@resend.dev" (sends to
+                          your Resend account email only).
+    """
+    if not RESEND_API_KEY:
+        print("[EMAIL] RESEND_API_KEY not set — skipping email")
+        return False, "RESEND_API_KEY not configured"
+
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"🍩 DonutSMP | {subject}"
-        msg["From"] = SMTP_USERNAME
-        msg["To"] = to_addr
-        msg.attach(MIMEText(html_body, "html"))
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SMTP_USERNAME, to_addr, msg.as_string())
-        return True, "OK"
+        resp = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": RESEND_FROM,
+                "to": [to_addr],
+                "subject": f"🍩 DonutSMP | {subject}",
+                "html": html_body,
+            },
+            timeout=15,
+        )
+        data = resp.json()
+        if resp.status_code in (200, 201):
+            print(f"[EMAIL] Sent to {to_addr} — id: {data.get('id')}")
+            return True, "OK"
+        else:
+            err = data.get("message") or data.get("error") or str(data)
+            print(f"[EMAIL ERROR] {resp.status_code}: {err}")
+            return False, err
     except Exception as e:
-        print(f"[EMAIL ERROR] {e}")
+        print(f"[EMAIL EXCEPTION] {e}")
         return False, str(e)
+
 
 def build_email_html(title, rows, extra=""):
     rows_html = "".join(
@@ -152,7 +177,6 @@ def api_get(path, json_body=None):
     try:
         url = f"{API_BASE}{path}"
         if json_body:
-            # Some servers ignore GET body — send as POST-style GET with data kwarg
             r = requests.get(url, headers=API_HEADERS, json=json_body, timeout=15)
         else:
             r = requests.get(url, headers=API_HEADERS, timeout=15)
@@ -215,9 +239,8 @@ def check_alerts_and_poll():
                 last_poll_info = {"time": datetime.now().isoformat(), "items": 0, "alerts": 0, "error": "No items returned"}
             return
 
-        # Build current snapshot keys
         current_keys = set()
-        current_by_name = {}  # display_name -> list of (price, seller, key)
+        current_by_name = {}
         for item in all_items:
             key = build_snapshot_key(item)
             current_keys.add(key)
@@ -233,7 +256,6 @@ def check_alerts_and_poll():
                 "time_left": item.get("time_left", 0)
             })
 
-        # Get known snapshot keys from DB
         known_rows = db.execute("SELECT snapshot_key FROM auction_snapshot").fetchall()
         known_keys = {r["snapshot_key"] for r in known_rows}
         new_keys = current_keys - known_keys
@@ -253,7 +275,6 @@ def check_alerts_and_poll():
             threshold = alert.get("threshold_price")
 
             if atype == "price_drop":
-                # Alert when item matching search is listed below threshold price
                 if search and threshold is not None:
                     for name, entries in current_by_name.items():
                         if search in name.lower():
@@ -272,16 +293,10 @@ def check_alerts_and_poll():
                             break
 
             elif atype == "price_decrease":
-                # Alert when an item's price decreases from what we last saw
                 if search:
                     for name, entries in current_by_name.items():
                         if search in name.lower():
                             for entry in entries:
-                                old_row = db.execute(
-                                    "SELECT price FROM auction_snapshot WHERE snapshot_key = ?",
-                                    (entry["key"],)
-                                ).fetchone()
-                                # Look for any older listing of same item at higher price
                                 old_best = db.execute(
                                     "SELECT MIN(price) as min_price FROM auction_snapshot WHERE item_name = ?",
                                     (name,)
@@ -300,7 +315,6 @@ def check_alerts_and_poll():
                             break
 
             elif atype == "seller_alert":
-                # Alert when specific seller lists anything new
                 if seller_filter:
                     for key in new_keys:
                         for item in all_items:
@@ -319,7 +333,6 @@ def check_alerts_and_poll():
                             break
 
             elif atype == "new_item_listing":
-                # Alert when any new listing matches search term
                 if search:
                     for key in new_keys:
                         for item in all_items:
@@ -338,7 +351,6 @@ def check_alerts_and_poll():
                             break
 
             elif atype == "any_new_listing":
-                # Alert on any new listing
                 if new_keys:
                     key = next(iter(new_keys))
                     for item in all_items:
@@ -379,7 +391,6 @@ def check_alerts_and_poll():
                 )
                 alerts_triggered += 1
 
-        # Update snapshot table
         now_str = datetime.now().isoformat()
         for item in all_items:
             key = build_snapshot_key(item)
@@ -398,7 +409,6 @@ def check_alerts_and_poll():
                 )
             )
 
-        # Prune stale snapshot entries (not seen in >1 hour)
         cutoff = (datetime.now() - timedelta(hours=1)).isoformat()
         db.execute("DELETE FROM auction_snapshot WHERE last_seen < ?", (cutoff,))
 
@@ -678,15 +688,15 @@ def clear_alert_history():
 @require_auth
 def test_email():
     data = request.get_json() or {}
-    to_addr = data.get("email", SMTP_USERNAME)
+    to_addr = data.get("email", "")
     if not to_addr:
         return jsonify({"success": False, "error": "No email address provided"}), 400
     html = build_email_html(
         "Test Email — Everything is working!",
         [
             ("Status", "✅ Connected"),
-            ("SMTP Host", "smtp.gmail.com:587"),
-            ("Sender", SMTP_USERNAME or "Not configured"),
+            ("Provider", "Resend (resend.com)"),
+            ("From", RESEND_FROM),
             ("Sent At", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
         ],
         extra="<div style='padding:16px 28px;color:#aaa;font-size:13px;'>Your DonutSMP Dashboard email alerts are configured and working correctly.</div>"
@@ -697,10 +707,13 @@ def test_email():
 @app.route("/api/settings/info")
 @require_auth
 def settings_info():
+    # Show whether Resend is configured without leaking the key
+    key_preview = (RESEND_API_KEY[:7] + "****") if len(RESEND_API_KEY) > 7 else ("****" if RESEND_API_KEY else "")
     return jsonify({
         "api_key": API_KEY[:4] + "****" if len(API_KEY) > 4 else "****",
-        "smtp_configured": bool(SMTP_USERNAME and SMTP_PASSWORD),
-        "smtp_username": SMTP_USERNAME if SMTP_USERNAME else None,
+        "smtp_configured": bool(RESEND_API_KEY),   # reuse field name so the UI still works
+        "smtp_username": RESEND_FROM if RESEND_API_KEY else None,
+        "resend_key_preview": key_preview,
         "api_base": API_BASE,
         "poll_interval_seconds": 10
     })
